@@ -5,7 +5,7 @@
 const VS = `#version 300 es
 precision highp float;
 in vec2 a;
-uniform float T, Asp, Dpr, Dim, Heat, CamY, Pitch, Pi, Flow;
+uniform float T, Asp, Dpr, Dim, Heat, CamY, Pitch, Pi, Flow, Glow;
 uniform float M[7];
 uniform vec2 P;
 out float vA;
@@ -76,6 +76,8 @@ void main(){
   float dz=zt-sw;
   vS=exp(-dz*dz*900.)*.9+exp(-dz*dz*40.)*.1;
   vA*=1.+vS*1.8;
+  // Bloom pass: the same points, larger and faint, only where the field runs hot.
+  if(Glow>.5){gl_PointSize=min(gl_PointSize*4.5,11.*Dpr);vA*=.16*(vH*vH+vS);}
 }`;
 
 const FS = `#version 300 es
@@ -84,13 +86,13 @@ in float vA;
 in float vH;
 in float vS;
 uniform vec3 Ink, Hot, Sig;
-uniform float Add;
+uniform float Add, Glow;
 out vec4 o;
 void main(){
   vec2 c=gl_PointCoord-.5;
   float r=dot(c,c);
   if(r>.25)discard;
-  float e=smoothstep(.25,.1,r);
+  float e=Glow>.5?exp(-r*14.):smoothstep(.25,.1,r);
   float a=vA*e*(.34+.66*vH);
   vec3 col=mix(mix(Ink,Hot,vH),Sig,clamp(vS,0.,1.));
   o=vec4(col,a);
@@ -98,7 +100,7 @@ void main(){
 
 //                 hero roam  move  driv  circ  calm  cont
 const CAM_Y   =   [2.5, 4.2,  3.1,  4.4,  3.0,  2.2,  2.3];
-const GRAPH   =   [.58, .3,   .38,  .3,   .4,   .5,   .55];
+const GRAPH   =   [1.0, .35,  .45,  .35,  .5,   .3,   .7];
 const PITCH   =   [.15, .26,  .32,  .38,  .24,  .13,  .1];
 const DIM     =   [.9,  .9,   1.05, .85,  1.1,  .42,  1.0];
 const HEAT    =   [.85, .75,  1.5,  .8,   1.2,  .35,  1.25];
@@ -139,7 +141,7 @@ void main(){
   }
   float t=fract(T*(.09+vP*.11)+vP*17.);
   float pulse=smoothstep(.07,0.,abs(t*1.2-.1-vS));
-  o=vec4(mix(Sig,Hot,step(.82,vP)),G*(.13+pulse*.95));
+  o=vec4(mix(Sig,Hot,step(.82,vP)),G*(.2+pulse*1.1));
 }`;
 
 const PALETTES = {
@@ -173,7 +175,7 @@ export function createWorld(canvas, { still = false } = {}) {
   }
   gl.useProgram(prog);
   const u = {};
-  for (const n of ['T', 'Asp', 'Dpr', 'Dim', 'Heat', 'CamY', 'Pitch', 'Pi', 'Flow', 'P', 'Ink', 'Hot', 'Sig', 'Add']) u[n] = gl.getUniformLocation(prog, n);
+  for (const n of ['T', 'Asp', 'Dpr', 'Dim', 'Heat', 'CamY', 'Pitch', 'Pi', 'Flow', 'P', 'Ink', 'Hot', 'Sig', 'Add', 'Glow']) u[n] = gl.getUniformLocation(prog, n);
   u.M = gl.getUniformLocation(prog, 'M');
 
   // --- signal network geometry (seeded, so every visit draws the same graph)
@@ -192,7 +194,7 @@ export function createWorld(canvas, { still = false } = {}) {
   for (let l = 0; l < LAYERS; l++) {
     const n = 5 + Math.floor(rnd() * 5);
     const col = [];
-    for (let i = 0; i < n; i++) col.push([(l / (LAYERS - 1)) * 1.9 - 0.95 + (rnd() - 0.5) * 0.05, 2.6 + (i / (n - 1)) * 6.4 + (rnd() - 0.5) * 0.5, -15 - rnd() * 10, rnd()]);
+    for (let i = 0; i < n; i++) col.push([(l / (LAYERS - 1)) * 1.9 - 0.95 + (rnd() - 0.5) * 0.05, 1.1 + (i / (n - 1)) * 3.4 + (rnd() - 0.5) * 0.35, -22 - rnd() * 9, rnd()]);
     layers.push(col);
   }
   const nodes = layers.flat();
@@ -305,7 +307,13 @@ export function createWorld(canvas, { still = false } = {}) {
     gl.uniform1f(u.Add, pal.add);
     gl.uniform1fv(u.M, w);
     gl.bindVertexArray(fieldVao);
+    gl.uniform1f(u.Glow, 0);
     gl.drawArrays(gl.POINTS, 0, count);
+    if (pal.add > 0.5 && quality === 1) {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      gl.uniform1f(u.Glow, 1);
+      gl.drawArrays(gl.POINTS, 0, count);
+    }
 
     gl.useProgram(gProg);
     gl.bindVertexArray(gVao);

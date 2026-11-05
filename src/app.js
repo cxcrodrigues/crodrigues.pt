@@ -97,7 +97,7 @@ function streamStatement(instant) {
   tks.forEach((t, i) => setTimeout(() => {
     t.classList.add('on');
     if (i === tks.length - 1) setTimeout(() => host.classList.remove('streaming'), 1600);
-  }, 450 + i * 62 + Math.random() * 34));
+  }, 380 + i * 42 + Math.random() * 22));
 }
 
 function observeReveals() {
@@ -177,7 +177,7 @@ function animateKinetic(time, dt) {
         // A slow carrier wave travels through the word even with no input.
         tw += Math.sin(time * 1.15 - i * 0.62) * 5;
         // A scan passes through the word every few seconds, turning letters to wireframe.
-        wire = Math.pow(Math.max(0, Math.sin(time * 0.55 - i * 0.2 + k.lines.length)), 42);
+        if (k.fit === 'last') wire = Math.pow(Math.max(0, Math.sin(time * 0.33 - i * 0.16)), 90);
         if (near) {
           const d = (pointer.x - l.cx) / reach;
           const g = Math.exp(-d * d);
@@ -226,16 +226,13 @@ function applyScroll(dt) {
   if (refs.bio && !still) {
     const r = refs.bio.getBoundingClientRect();
     if (r.top < vh && r.bottom > 0) {
-      const p = clamp((vh * 0.82 - r.top) / (r.height + vh * 0.25));
+      const p = clamp((vh * 0.9 - r.top) / (r.height * 0.85));
       const lit = Math.round(p * refs.words.length);
       if (lit !== refs.lit) {
         const a = Math.min(lit, refs.lit < 0 ? 0 : refs.lit);
         const b = Math.max(lit, refs.lit < 0 ? refs.words.length : refs.lit);
         for (let i = a; i < b; i++) refs.words[i].classList.toggle('on', i < lit);
         refs.lit = lit;
-        refs.edge?.classList.remove('edge');
-        refs.edge = refs.words[Math.max(0, lit - 1)];
-        if (lit < refs.words.length) refs.edge?.classList.add('edge');
       }
     }
   }
@@ -371,6 +368,7 @@ function frame(now) {
   if (!document.hidden) {
     applyScroll(dt);
     animateKinetic(now / 1000, dt);
+    moveRing(dt);
     if (world) {
       if (!world.still) world.draw(dt);
       else if (needsStillFrames > 0) { world.draw(0.05); needsStillFrames--; }
@@ -379,7 +377,16 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-const scope = { x: $('.scope .sx'), y: $('.scope .sy'), b: $('.scope b') };
+// A trailing ring: it lags the pointer slightly and opens up over anything you can act on.
+const ring = { el: $('.ring'), x: -100, y: -100, s: 1, hot: false };
+function moveRing(dt) {
+  if (!root.classList.contains('ring-on')) return;
+  const k = 1 - Math.exp(-dt * 16);
+  ring.x += (pointer.x - ring.x) * k;
+  ring.y += (pointer.y - ring.y) * k;
+  ring.s += ((ring.hot ? 2.1 : 1) - ring.s) * (1 - Math.exp(-dt * 10));
+  ring.el.style.transform = `translate3d(${ring.x.toFixed(1)}px,${ring.y.toFixed(1)}px,0) scale(${ring.s.toFixed(3)})`;
+}
 
 // ---- interactions ----------------------------------------------------------------------
 function setTheme(next, origin) {
@@ -460,11 +467,8 @@ async function copy(btn) {
 addEventListener('pointermove', (e) => {
   pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true;
   if (finePointer.matches && !reduced.matches) {
-    root.classList.add('scope-on');
-    scope.x.style.transform = `translate3d(0,${e.clientY}px,0)`;
-    scope.y.style.transform = `translate3d(${e.clientX}px,0,0)`;
-    scope.b.style.transform = `translate3d(${e.clientX + 12}px,${e.clientY + 12}px,0)`;
-    scope.b.textContent = `X${String(Math.round(e.clientX)).padStart(4, '0')} Y${String(Math.round(e.clientY + scrollY)).padStart(5, '0')}`;
+    root.classList.add('ring-on');
+    ring.hot = !!e.target.closest?.('a, button, summary, [data-kinetic]');
   }
   if (finePointer.matches && !reduced.matches && world) {
     world.setPointer((e.clientX / innerWidth) * 2 - 1, 1 - (e.clientY / innerHeight) * 2, true);
