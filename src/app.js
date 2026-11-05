@@ -27,6 +27,35 @@ let locale = initialLocale();
 const world = createWorld($('#world'), { still: reduced.matches });
 if (!world) root.classList.add('no-world');
 
+// ---- footage: one graded clip per project, loaded only when it's about to be seen
+const saveData = !!navigator.connection?.saveData;
+const media = [...document.querySelectorAll('.media .m')].map((fig) => ({ fig, id: +fig.dataset.m, v: fig.querySelector('video'), timer: 0 }));
+function load(m) {
+  if (reduced.matches || saveData || m.v.src) return;
+  m.v.src = m.v.dataset.src;
+  m.v.preload = 'auto';
+}
+function setMedia(mode) {
+  for (const m of media) {
+    const on = m.id === mode;
+    m.fig.classList.toggle('on', on);
+    clearTimeout(m.timer);
+    if (on) {
+      load(m);
+      if (m.v.src) m.v.play().catch(() => {});
+      const next = media.find((n) => n.id === m.id + 1);
+      if (next) load(next);
+    } else if (m.v.src) {
+      m.timer = setTimeout(() => m.v.pause(), 1500);
+    }
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  const on = media.find((m) => m.fig.classList.contains('on'));
+  if (!on?.v.src) return;
+  if (document.hidden) on.v.pause(); else on.v.play().catch(() => {});
+});
+
 // ---- per-render references --------------------------------------------------
 let refs = {};
 let revealObserver;
@@ -213,6 +242,7 @@ function applyScroll(dt) {
   const max = Math.max(1, document.documentElement.scrollHeight - vh);
   refs.bar.style.transform = `scaleX(${clamp(sy / max).toFixed(4)})`;
   root.classList.toggle('scrolled', sy > 40);
+  if (sy > vh * 1.2 && media[0]) load(media[0]);
 
   // Hero: the name splits apart as you leave.
   if (!still && refs.hero) {
@@ -269,7 +299,7 @@ function applyScroll(dt) {
     const r = el.getBoundingClientRect();
     if (r.top <= vh * 0.55 && r.bottom >= vh * 0.45) { mode = +el.dataset.world; active = el; }
   }
-  if (mode !== lastMode) { world?.setMode(mode); lastMode = mode; if (world?.still) needsStillFrames = 40; }
+  if (mode !== lastMode) { world?.setMode(mode); setMedia(mode); lastMode = mode; if (world?.still) needsStillFrames = 40; }
 
   // HUD + nav
   const id = active?.closest('section[id]')?.id || null;

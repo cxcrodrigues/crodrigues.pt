@@ -11,6 +11,7 @@ const types = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json',
   '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.png': 'image/png', '.txt': 'text/plain; charset=utf-8',
+  '.mp4': 'video/mp4', '.webp': 'image/webp',
 };
 const security = {
   'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
@@ -53,13 +54,33 @@ createServer(async (req, res) => {
   const etag = `"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`;
   const headers = {
     'Content-Type': types[extname(path)] || 'application/octet-stream',
-    'Cache-Control': extname(path) === '.woff2' ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate',
+    'Cache-Control': extname(path) === '.woff2' ? 'public, max-age=31536000, immutable'
+      : ['.mp4', '.webp'].includes(extname(path)) ? 'public, max-age=604800'
+      : 'public, max-age=0, must-revalidate',
+    'Accept-Ranges': 'bytes',
     ETag: etag,
     Vary: 'Accept-Encoding',
     ...security,
   };
   if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return; }
   if (encoding) headers['Content-Encoding'] = encoding;
+
+  // Byte ranges: required for video seeking, and Safari won't play video without them.
+  const range = !encoding && /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ''));
+  if (range && (range[1] || range[2])) {
+    let start = range[1] ? Number(range[1]) : Math.max(0, st.size - Number(range[2]));
+    let end = range[1] && range[2] ? Math.min(Number(range[2]), st.size - 1) : st.size - 1;
+    if (start > end || start >= st.size) {
+      res.writeHead(416, { 'Content-Range': `bytes */${st.size}`, ...security }).end();
+      return;
+    }
+    headers['Content-Range'] = `bytes ${start}-${end}/${st.size}`;
+    headers['Content-Length'] = end - start + 1;
+    res.writeHead(206, headers);
+    if (req.method === 'HEAD') { res.end(); return; }
+    createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
+    return;
+  }
   headers['Content-Length'] = st.size;
   res.writeHead(200, headers);
   if (req.method === 'HEAD') { res.end(); return; }

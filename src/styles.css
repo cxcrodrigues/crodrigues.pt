@@ -30,6 +30,19 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .no-world body{background:radial-gradient(90% 60% at 50% 110%,rgba(255,90,31,.2),transparent 70%),var(--bg)}
 .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:var(--grain);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E")}
 #root{position:relative;z-index:2}
+/* Footage is graded into the palette: monochrome, tinted signal-cyan to ignition-orange,
+   then screened onto the field so blacks vanish and the points keep showing through. */
+.media{position:fixed;inset:0;z-index:1;pointer-events:none;mix-blend-mode:screen}
+.m{position:absolute;inset:0;margin:0;opacity:0;overflow:hidden;isolation:isolate;transition:opacity 1.6s var(--ease)}
+.m.on{opacity:1}
+.m video{width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(1) contrast(1.3) brightness(.7);transform:scale(1.12);transition:transform 14s cubic-bezier(.2,.6,.3,1)}
+.m.on video{transform:scale(1.02)}
+.m::after{content:"";position:absolute;inset:0;background:linear-gradient(155deg,#37e6d8 0%,#1f7f8a 48%,#ff5a1f 115%);mix-blend-mode:multiply}
+.m::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.1) 36%,transparent 50%,rgba(0,0,0,.25) 62%,#000 96%),radial-gradient(70% 60% at 22% 82%,rgba(0,0,0,.65),transparent 70%);mix-blend-mode:multiply}
+[data-theme=light] .media{mix-blend-mode:multiply;opacity:.6}
+[data-theme=light] .m video{filter:grayscale(1) contrast(.9) brightness(1.45)}
+[data-theme=light] .m::after{background:linear-gradient(155deg,#9fe0dc 0%,#6fb3b6 50%,#f2a27c 115%)}
+[data-theme=light] .m::before{background:linear-gradient(rgba(255,255,255,.6),rgba(255,255,255,.15) 36%,transparent 50%,rgba(255,255,255,.3) 62%,#fff 96%),radial-gradient(70% 60% at 22% 82%,rgba(255,255,255,.7),transparent 70%);mix-blend-mode:screen}
 .lattice{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.32;
   --cell:calc((100vw - var(--gutter)*2)/12);
   background-image:linear-gradient(to right,var(--line) 1px,transparent 1px);
@@ -350,6 +363,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   .pulse::after{animation:none}
   .name .li{animation:none}
   .ring{display:none}
+  .m video{transform:none!important;transition:none}
   .job::details-content{transition:none}
   .band-track{flex-wrap:wrap;width:auto}
   html{scroll-behavior:auto}
@@ -360,7 +374,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   @page{size:A4;margin:14mm 15mm}
   :root,[data-theme=dark],[data-theme=light]{--bg:#fff;--bg-rgb:255,255,255;--ink:#000;--muted:#444;--line:#bbb;--accent:#000;--on-accent:#fff}
   html,body{background:#fff!important;color:#000;font-size:10pt;line-height:1.36}
-  #world,.grain,.lattice,.vignette,.ring,.header,.menu,.progress,.hud-section,.intro,.curtain,.skip,.hero-top,.hud,.work,.chart,.band,.contact,.section-head span{display:none!important}
+  #world,.media,.grain,.lattice,.vignette,.ring,.header,.menu,.progress,.hud-section,.intro,.curtain,.skip,.hero-top,.hud,.work,.chart,.band,.contact,.section-head span{display:none!important}
   .reveal,.js .reveal{opacity:1!important;transform:none!important}
   .hero{min-height:0;padding:0;display:block}
   .name{font-size:27pt!important;letter-spacing:-.01em;line-height:1}
