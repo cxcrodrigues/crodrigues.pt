@@ -39,6 +39,15 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .m.on video{transform:scale(1.02)}
 .m::after{content:"";position:absolute;inset:0;background:linear-gradient(155deg,#37e6d8 0%,#1f7f8a 48%,#ff5a1f 115%);mix-blend-mode:multiply}
 .m::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.1) 36%,transparent 50%,rgba(0,0,0,.25) 62%,#000 96%),radial-gradient(70% 60% at 22% 82%,rgba(0,0,0,.65),transparent 70%);mix-blend-mode:multiply}
+/* Opening shot: a band of footage behind the name, Lisbon and Berlin crossfading. */
+.duo{--t:var(--name-top,55vh);--b:var(--name-bottom,92vh);
+  -webkit-mask-image:linear-gradient(transparent calc(var(--t) - 14vh),#000 calc(var(--t) + 2vh),#000 calc(var(--b) - 4vh),transparent calc(var(--b) + 10vh));
+  mask-image:linear-gradient(transparent calc(var(--t) - 14vh),#000 calc(var(--t) + 2vh),#000 calc(var(--b) - 4vh),transparent calc(var(--b) + 10vh));
+  height:auto;bottom:auto;min-height:100vh;will-change:transform}
+.duo video{position:absolute;inset:0;opacity:0;transition:opacity 1.6s var(--ease),transform 9s cubic-bezier(.2,.6,.3,1)}
+.duo:not([data-cur]) video:first-child,.duo[data-cur="0"] video:nth-child(1),.duo[data-cur="1"] video:nth-child(2){opacity:1;transform:scale(1)}
+.duo::before{display:none}
+.duo::after{background:linear-gradient(100deg,#37e6d8 0%,#1f7f8a 50%,#ff5a1f 120%)}
 [data-theme=light] .media{mix-blend-mode:multiply;opacity:.6}
 [data-theme=light] .m video{filter:grayscale(1) contrast(.9) brightness(1.45)}
 [data-theme=light] .m::after{background:linear-gradient(155deg,#9fe0dc 0%,#6fb3b6 50%,#f2a27c 115%)}

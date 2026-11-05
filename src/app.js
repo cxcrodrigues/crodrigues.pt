@@ -29,11 +29,26 @@ if (!world) root.classList.add('no-world');
 
 // ---- footage: one graded clip per project, loaded only when it's about to be seen
 const saveData = !!navigator.connection?.saveData;
-const media = [...document.querySelectorAll('.media .m')].map((fig) => ({ fig, id: +fig.dataset.m, v: fig.querySelector('video'), timer: 0 }));
+const media = [...document.querySelectorAll('.media .m')].map((fig) => ({ fig, id: +fig.dataset.m, vids: [...fig.querySelectorAll('video')], cur: 0, timer: 0, cycle: 0 }));
+const heroMedia = media.find((m) => m.id === 0);
+const current = (m) => m.vids[m.cur];
 function load(m) {
-  if (reduced.matches || saveData || m.v.src) return;
-  m.v.src = m.v.dataset.src;
-  m.v.preload = 'auto';
+  if (reduced.matches || saveData) return;
+  for (const v of m.vids) if (!v.src) { v.src = v.dataset.src; v.preload = 'auto'; }
+}
+// The opening shot: Lisbon and Berlin cut into each other behind the name.
+function cycleDuo(m) {
+  clearInterval(m.cycle);
+  if (m.vids.length < 2) return;
+  m.cycle = setInterval(() => {
+    const prev = current(m);
+    m.cur = (m.cur + 1) % m.vids.length;
+    const next = current(m);
+    next.currentTime = 0;
+    next.play().catch(() => {});
+    m.fig.dataset.cur = m.cur;
+    setTimeout(() => prev.pause(), 1700);
+  }, 6500);
 }
 function setMedia(mode) {
   for (const m of media) {
@@ -42,18 +57,21 @@ function setMedia(mode) {
     clearTimeout(m.timer);
     if (on) {
       load(m);
-      if (m.v.src) m.v.play().catch(() => {});
-      const next = media.find((n) => n.id === m.id + 1);
-      if (next) load(next);
-    } else if (m.v.src) {
-      m.timer = setTimeout(() => m.v.pause(), 1500);
+      if (current(m).src) current(m).play().catch(() => {});
+      if (m.id === 0) cycleDuo(m);
+      const order = [0, 7, 1, 2, 3, 4];
+      const next = media.find((n) => n.id === order[order.indexOf(m.id) + 1]);
+      if (next && m.id !== 0) load(next);
+    } else {
+      clearInterval(m.cycle);
+      if (current(m).src) m.timer = setTimeout(() => m.vids.forEach((v) => v.pause()), 1500);
     }
   }
 }
 document.addEventListener('visibilitychange', () => {
   const on = media.find((m) => m.fig.classList.contains('on'));
-  if (!on?.v.src) return;
-  if (document.hidden) on.v.pause(); else on.v.play().catch(() => {});
+  if (!on || !current(on).src) return;
+  if (document.hidden) current(on).pause(); else current(on).play().catch(() => {});
 });
 
 // ---- per-render references --------------------------------------------------
@@ -179,6 +197,11 @@ function fit() {
     const room = avail * (pinnable.matches ? 0.9 : 1);
     if (width > room) host.style.fontSize = `${(parseFloat(getComputedStyle(host).fontSize) * room / width).toFixed(2)}px`;
   }
+  const nameBox = $('.name')?.getBoundingClientRect();
+  if (nameBox) {
+    root.style.setProperty('--name-top', `${(nameBox.top + scrollY).toFixed(0)}px`);
+    root.style.setProperty('--name-bottom', `${(nameBox.bottom + scrollY).toFixed(0)}px`);
+  }
   for (const k of refs.kinetic) for (const l of k.letters) {
     const r = l.n.getBoundingClientRect();
     l.cx = r.left + r.width / 2;
@@ -242,7 +265,9 @@ function applyScroll(dt) {
   const max = Math.max(1, document.documentElement.scrollHeight - vh);
   refs.bar.style.transform = `scaleX(${clamp(sy / max).toFixed(4)})`;
   root.classList.toggle('scrolled', sy > 40);
-  if (sy > vh * 1.2 && media[0]) load(media[0]);
+  if (sy > vh * 1.2) { const first = media.find((m) => m.id === 7); if (first) load(first); }
+  // The hero footage lives in a band behind the name, so it travels with it.
+  if (heroMedia) heroMedia.fig.style.transform = `translate3d(0,${(-sy).toFixed(1)}px,0)`;
 
   // Hero: the name splits apart as you leave.
   if (!still && refs.hero) {
@@ -299,7 +324,7 @@ function applyScroll(dt) {
     const r = el.getBoundingClientRect();
     if (r.top <= vh * 0.55 && r.bottom >= vh * 0.45) { mode = +el.dataset.world; active = el; }
   }
-  if (mode !== lastMode) { world?.setMode(mode); setMedia(mode); lastMode = mode; if (world?.still) needsStillFrames = 40; }
+  if (mode !== lastMode) { world?.setMode(mode); if (!introPlaying || mode !== 0) setMedia(mode); lastMode = mode; if (world?.still) needsStillFrames = 40; }
 
   // HUD + nav
   const id = active?.closest('section[id]')?.id || null;
@@ -375,6 +400,7 @@ function runIntro() {
       intro.classList.add('done');
       world?.setMaster(1);
       streamStatement(false);
+      if (lastMode === 0) setMedia(0);
       const a0 = now;
       const grow = (n) => {
         introAmp = easeOut(clamp((n - a0) / 1500));

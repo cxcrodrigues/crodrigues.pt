@@ -83,6 +83,10 @@ export default {
      "integrations": "Integrations"
     },
     "items": {
+     "fjordrun": {
+      "kind": "European cloud platform",
+      "summary": "A European platform for running apps: web services, databases, cron jobs, functions and AI agents, deployed from a git push. AI agents can operate it through its MCP server. I’m founding it and building it, and this site runs on it."
+     },
      "roamlii": {
       "kind": "AI platform for Canadian tourism",
       "summary": "Operators manage their listings and hiring through an assistant, and travellers find what's on nearby. As CTO, I built the MCP server that opens the platform to any AI client, with every operator change held for human review."
@@ -305,6 +309,10 @@ export default {
      "integrations": "Integrações"
     },
     "items": {
+     "fjordrun": {
+      "kind": "Plataforma cloud europeia",
+      "summary": "Uma plataforma europeia para correr aplicações: serviços web, bases de dados, cron jobs, funções e agentes de IA, implementados a partir de um git push. Os agentes de IA podem operá-la através do seu servidor MCP. Estou a fundá-la e a construí-la, e este site corre nela."
+     },
      "roamlii": {
       "kind": "Plataforma de IA para o turismo canadiano",
       "summary": "Os operadores gerem as suas listagens e contratações através de um assistente, e os viajantes descobrem o que há por perto. Como CTO, construí o servidor MCP que abre a plataforma a qualquer cliente de IA, com cada alteração de um operador sujeita a revisão humana."
@@ -527,6 +535,10 @@ export default {
      "integrations": "Integraciones"
     },
     "items": {
+     "fjordrun": {
+      "kind": "Plataforma cloud europea",
+      "summary": "Una plataforma europea para ejecutar aplicaciones: servicios web, bases de datos, cron jobs, funciones y agentes de IA, desplegados con un git push. Los agentes de IA pueden operarla a través de su servidor MCP. La estoy fundando y construyendo, y este sitio funciona sobre ella."
+     },
      "roamlii": {
       "kind": "Plataforma de IA para el turismo canadiense",
       "summary": "Los operadores gestionan sus listados y contrataciones a través de un asistente, y los viajeros descubren qué hay cerca. Como CTO, construí el servidor MCP que abre la plataforma a cualquier cliente de IA, con cada cambio de un operador sujeto a revisión humana."
@@ -749,6 +761,10 @@ export default {
      "integrations": "Integrationen"
     },
     "items": {
+     "fjordrun": {
+      "kind": "Europäische Cloud-Plattform",
+      "summary": "Eine europäische Plattform zum Betreiben von Apps: Webdienste, Datenbanken, Cronjobs, Functions und KI-Agenten, bereitgestellt per git push. KI-Agenten können sie über ihren MCP-Server bedienen. Ich gründe sie gerade und baue sie auf, und diese Website läuft darauf."
+     },
      "roamlii": {
       "kind": "KI-Plattform für den kanadischen Tourismus",
       "summary": "Anbieter verwalten ihre Einträge und Stellen über einen Assistenten, und Reisende finden, was in der Nähe los ist. Als CTO habe ich den MCP-Server gebaut, der die Plattform für jeden KI-Client öffnet, wobei jede Änderung eines Anbieters von einem Menschen geprüft wird."
@@ -975,6 +991,28 @@ export default {
   }
  },
  "projects": [
+  {
+   "id": "fjordrun",
+   "name": "Fjordrun",
+   "stack": [
+    [
+     "ai",
+     "MCP server for AI agents"
+    ],
+    [
+     "delivery",
+     "Git push deploys, Nixpacks, Dockerfile builds"
+    ],
+    [
+     "data",
+     "Managed Postgres, MySQL, Redis, MongoDB"
+    ],
+    [
+     "infra",
+     "EU regions: Falkenstein, Nuremberg, Helsinki"
+    ]
+   ]
+  },
   {
    "id": "roamlii",
    "name": "Roamlii",

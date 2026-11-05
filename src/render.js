@@ -12,6 +12,9 @@ const letters = (text) => [...text].map((c, i) => c === ' '
 
 const kinetic = (text, cls = '') => `<span class="kline ${cls}" aria-hidden="true">${letters(text)}</span>`;
 
+// Terrain mode for each project (see world.js).
+const WORLD = { fjordrun: 7, roamlii: 1, movize: 2, driverwise: 3, circunomics: 4 };
+
 const months = (s) => { const [y, m] = s.split('-').map(Number); return y * 12 + (m - 1); };
 
 function chart(t, now) {
@@ -110,7 +113,7 @@ export function renderPage(locale, now = new Date()) {
     ${projects.map((p, i) => {
       const item = t.work.items[p.id];
       const name = p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><span class="sr-only">${esc(p.name)}</span>${kinetic(p.name)}</a>` : `<span class="sr-only">${esc(p.name)}</span>${kinetic(p.name)}`;
-      return `<article class="project" data-project data-world="${i + 1}">
+      return `<article class="project" data-project data-world="${WORLD[p.id]}">
         <div class="project-in">
           <div class="p-top mono"><span>${pad(i + 1)} / ${pad(projects.length)}</span><span>${esc(item.kind)}</span></div>
           <h3 class="p-name" data-kinetic>${name}</h3>

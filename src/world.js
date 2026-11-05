@@ -6,7 +6,7 @@ const VS = `#version 300 es
 precision highp float;
 in vec2 a;
 uniform float T, Asp, Dpr, Dim, Heat, CamY, Pitch, Pi, Flow, Glow;
-uniform float M[7];
+uniform float M[8];
 uniform vec2 P;
 out float vA;
 out float vH;
@@ -43,6 +43,9 @@ float heightAt(vec2 g){
   if(M[6]>.002){vec2 q=g-vec2(0.,-15.);float r=length(q);
     float peak=exp(-r*r*.024)*(3.1+ridged(q*.26+T*.04)*1.9);
     h+=M[6]*(peak+sin(r*1.5-T*1.2)*.2*exp(-r*.1));}
+  // 7 Fjordrun: a fjord, steep walls cut by a winding channel of water
+  if(M[7]>.002){float c=sin(p.y*.11)*4.5+fbm(p*.05)*3.;float d=abs(g.x-c);float wall=smoothstep(1.4,5.8,d);
+    float r=ridged(p*.2+5.);h+=M[7]*(wall*(1.4+r*3.4)-.3+(1.-wall)*.07*sin(p.y*1.3-T*1.4+g.x*.6));}
   return h;
 }
 
@@ -98,13 +101,13 @@ void main(){
   o=vec4(col,a);
 }`;
 
-//                 hero roam  move  driv  circ  calm  cont
-const CAM_Y   =   [2.5, 4.2,  3.1,  4.4,  3.0,  2.2,  2.3];
-const GRAPH   =   [1.0, .2,   .3,   .2,   .3,   .3,   .7];
-const PITCH   =   [.15, .26,  .32,  .38,  .24,  .13,  .1];
-const DIM     =   [.9,  .55,  .6,   .5,   .65,  .42,  1.0];
-const HEAT    =   [.85, .75,  1.5,  .8,   1.2,  .35,  1.25];
-const FLOW    =   [.55, .22,  .15,  .1,   .05,  .28,  .1];
+//                 hero roam  move  driv  circ  calm  cont  fjord
+const CAM_Y   =   [2.5, 4.2,  3.1,  4.4,  3.0,  2.2,  2.3, 3.6];
+const GRAPH   =   [1.0, .2,   .3,   .2,   .3,   .3,   .7, .3];
+const PITCH   =   [.15, .26,  .32,  .38,  .24,  .13,  .1, .3];
+const DIM     =   [.9,  .55,  .6,   .5,   .65,  .42,  1.0, .6];
+const HEAT    =   [.85, .75,  1.5,  .8,   1.2,  .35,  1.25, 1.0];
+const FLOW    =   [.55, .22,  .15,  .1,   .05,  .28,  .1, .2];
 
 // Signal network: a layered graph floating above the terrain, pulses running along its edges.
 const GVS = `#version 300 es
@@ -255,7 +258,7 @@ export function createWorld(canvas, { still = false } = {}) {
   }
   resize();
 
-  const w = [1, 0, 0, 0, 0, 0, 0];
+  const w = [1, 0, 0, 0, 0, 0, 0, 0];
   const pal = { bg: [0, 0, 0], ink: [0, 0, 0], hot: [0, 0, 0], sig: [0, 0, 0], add: 1 };
   const applyPal = (name, snap) => {
     const p = PALETTES[name];
@@ -272,8 +275,8 @@ export function createWorld(canvas, { still = false } = {}) {
   function draw(dt) {
     const kMode = 1 - Math.exp(-dt * (still ? 100 : 1.9));
     let sum = 0;
-    for (let i = 0; i < 7; i++) { w[i] += ((i === target.mode ? 1 : 0) - w[i]) * kMode; sum += w[i]; }
-    for (let i = 0; i < 7; i++) w[i] /= sum;
+    for (let i = 0; i < 8; i++) { w[i] += ((i === target.mode ? 1 : 0) - w[i]) * kMode; sum += w[i]; }
+    for (let i = 0; i < 8; i++) w[i] /= sum;
 
     const kPal = 1 - Math.exp(-dt * 6);
     for (const key of ['bg', 'ink', 'hot', 'sig']) for (let i = 0; i < 3; i++) pal[key][i] += (target.pal[key][i] - pal[key][i]) * kPal;
