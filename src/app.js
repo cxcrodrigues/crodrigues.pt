@@ -68,10 +68,46 @@ function mount() {
   countUp();
 }
 
+const GLYPHS = '01<>/\\_#+:=*[]';
+function scramble(el) {
+  if (reduced.matches || el.dataset.busy) return;
+  const text = el.dataset.text || el.textContent;
+  el.dataset.text = text;
+  el.dataset.busy = '1';
+  const begin = performance.now();
+  const dur = 650 + text.length * 16;
+  const step = (now) => {
+    const p = clamp((now - begin) / dur);
+    const solved = Math.floor(easeOut(p) * text.length);
+    let out = text.slice(0, solved);
+    for (let i = solved; i < text.length; i++) out += text[i] === ' ' ? ' ' : GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+    el.textContent = out;
+    if (p < 1) requestAnimationFrame(step);
+    else { el.textContent = text; delete el.dataset.busy; }
+  };
+  requestAnimationFrame(step);
+}
+
+function streamStatement(instant) {
+  const host = $('[data-stream]');
+  if (!host) return;
+  const tks = $$('.tk', host);
+  if (instant || reduced.matches) { tks.forEach((t) => t.classList.add('on')); return; }
+  host.classList.add('streaming');
+  tks.forEach((t, i) => setTimeout(() => {
+    t.classList.add('on');
+    if (i === tks.length - 1) setTimeout(() => host.classList.remove('streaming'), 1600);
+  }, 450 + i * 62 + Math.random() * 34));
+}
+
 function observeReveals() {
   revealObserver?.disconnect();
   revealObserver = new IntersectionObserver((entries) => {
-    for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); revealObserver.unobserve(e.target); }
+    for (const e of entries) if (e.isIntersecting) {
+      e.target.classList.add('in');
+      revealObserver.unobserve(e.target);
+      (e.target.matches('[data-scramble]') ? [e.target] : $$('[data-scramble]', e.target)).forEach(scramble);
+    }
   }, { rootMargin: '0px 0px -6% 0px', threshold: 0.02 });
   $$('.reveal, .project').forEach((el) => revealObserver.observe(el));
 }
@@ -85,6 +121,7 @@ function fit() {
   const avail = vw - gutter * 2;
   for (const k of refs.kinetic) {
     k.letters.forEach((l) => { l.n.style.fontVariationSettings = '"wdth" 100, "wght" 760'; });
+    if (!k.fit) continue;
     k.el.style.fontSize = '100px';
     const widest = Math.max(...k.lines.map((n) => {
       const r = document.createRange();
@@ -101,10 +138,6 @@ function fit() {
       size = Math.min(size, Math.max(left / ratio, vw * 0.1));
     }
     k.el.style.fontSize = `${size.toFixed(2)}px`;
-    for (const l of k.letters) {
-      const r = l.n.getBoundingClientRect();
-      l.cx = r.left + r.width / 2;
-    }
   }
   // Project names only ever shrink to fit, keeping room for their horizontal drift.
   for (const p of refs.projects) {
@@ -116,6 +149,10 @@ function fit() {
     const width = r.getBoundingClientRect().width;
     const room = avail * (pinnable.matches ? 0.9 : 1);
     if (width > room) host.style.fontSize = `${(parseFloat(getComputedStyle(host).fontSize) * room / width).toFixed(2)}px`;
+  }
+  for (const k of refs.kinetic) for (const l of k.letters) {
+    const r = l.n.getBoundingClientRect();
+    l.cx = r.left + r.width / 2;
   }
   world?.resize();
 }
@@ -135,20 +172,25 @@ function animateKinetic(time, dt) {
     const reach = box.width * 0.15;
     for (let i = 0; i < k.letters.length; i++) {
       const l = k.letters[i];
-      let tw = 96, tg = 760;
+      let tw = 96, tg = 760, wire = 0;
       if (!still) {
         // A slow carrier wave travels through the word even with no input.
         tw += Math.sin(time * 1.15 - i * 0.62) * 5;
+        // A scan passes through the word every few seconds, turning letters to wireframe.
+        wire = Math.pow(Math.max(0, Math.sin(time * 0.55 - i * 0.2 + k.lines.length)), 42);
         if (near) {
           const d = (pointer.x - l.cx) / reach;
           const g = Math.exp(-d * d);
           tw = tw * (1 - g) + 125 * g - 7 * (1 - g);
           tg = 760 + g * 140;
+          wire = Math.max(wire, g);
         }
         tw = 62 + (tw - 62) * introAmp;
       }
       l.w += (tw - l.w) * k1;
       l.g += (tg - l.g) * k2;
+      l.v = (l.v || 0) + (wire - (l.v || 0)) * k1;
+      if (Math.abs(l.v - (l.pv ?? -1)) > 0.01) { l.n.style.setProperty('--v', l.v.toFixed(2)); l.pv = l.v; }
       if (Math.abs(l.w - l.pw) > 0.05 || Math.abs(l.g - l.pg) > 0.5 || l.pw === undefined) {
         l.n.style.fontVariationSettings = `"wdth" ${l.w.toFixed(1)}, "wght" ${l.g.toFixed(0)}`;
         l.pw = l.w; l.pg = l.g;
@@ -191,6 +233,9 @@ function applyScroll(dt) {
         const b = Math.max(lit, refs.lit < 0 ? refs.words.length : refs.lit);
         for (let i = a; i < b; i++) refs.words[i].classList.toggle('on', i < lit);
         refs.lit = lit;
+        refs.edge?.classList.remove('edge');
+        refs.edge = refs.words[Math.max(0, lit - 1)];
+        if (lit < refs.words.length) refs.edge?.classList.add('edge');
       }
     }
   }
@@ -278,7 +323,7 @@ setInterval(tickClock, 1000);
 let introPlaying = false;
 function runIntro() {
   const intro = $('.intro');
-  const fast = () => { root.classList.remove('booting', 'intro-on'); root.classList.add('ready'); introAmp = 1; world?.setMaster(1); };
+  const fast = () => { root.classList.remove('booting', 'intro-on'); root.classList.add('ready'); introAmp = 1; world?.setMaster(1); streamStatement(true); };
   let seen = false;
   try { seen = sessionStorage.getItem('intro') === '1'; sessionStorage.setItem('intro', '1'); } catch {}
   if (reduced.matches || scrollY > 10 || location.hash) { fast(); return; }
@@ -302,6 +347,7 @@ function runIntro() {
       root.classList.remove('intro-on');
       intro.classList.add('done');
       world?.setMaster(1);
+      streamStatement(false);
       const a0 = now;
       const grow = (n) => {
         introAmp = easeOut(clamp((n - a0) / 1500));
@@ -333,6 +379,8 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+const scope = { x: $('.scope .sx'), y: $('.scope .sy'), b: $('.scope b') };
+
 // ---- interactions ----------------------------------------------------------------------
 function setTheme(next, origin) {
   const apply = () => {
@@ -361,6 +409,7 @@ function setLocale(next) {
     mount();
     $$('.job').forEach((d) => { d.open = open.includes(d.id); });
     $$('.reveal, .project').forEach((el) => el.classList.add('in'));
+    streamStatement(true);
     scrollTo({ top: ratio * (document.documentElement.scrollHeight - innerHeight), behavior: 'instant' });
     sy = scrollY;
   };
@@ -410,6 +459,13 @@ async function copy(btn) {
 
 addEventListener('pointermove', (e) => {
   pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true;
+  if (finePointer.matches && !reduced.matches) {
+    root.classList.add('scope-on');
+    scope.x.style.transform = `translate3d(0,${e.clientY}px,0)`;
+    scope.y.style.transform = `translate3d(${e.clientX}px,0,0)`;
+    scope.b.style.transform = `translate3d(${e.clientX + 12}px,${e.clientY + 12}px,0)`;
+    scope.b.textContent = `X${String(Math.round(e.clientX)).padStart(4, '0')} Y${String(Math.round(e.clientY + scrollY)).padStart(5, '0')}`;
+  }
   if (finePointer.matches && !reduced.matches && world) {
     world.setPointer((e.clientX / innerWidth) * 2 - 1, 1 - (e.clientY / innerHeight) * 2, true);
   }

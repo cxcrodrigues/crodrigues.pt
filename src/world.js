@@ -10,6 +10,7 @@ uniform float M[7];
 uniform vec2 P;
 out float vA;
 out float vH;
+out float vS;
 
 vec2 h2(vec2 p){p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));return -1.+2.*fract(sin(p)*43758.5453);}
 float h1(vec2 p){return fract(sin(dot(p,vec2(41.3,289.1)))*43758.5453);}
@@ -70,13 +71,19 @@ void main(){
   float side=1.-smoothstep(.72,1.,abs(a.x));
   vA=far*near*side*Dim;
   vH=clamp(smoothstep(.3,2.1,h)*Heat+lift*.7,0.,1.);
+  // A scan front keeps sweeping the field, like a model reading its input.
+  float sw=fract(T*.06);
+  float dz=zt-sw;
+  vS=exp(-dz*dz*900.)*.9+exp(-dz*dz*40.)*.1;
+  vA*=1.+vS*1.8;
 }`;
 
 const FS = `#version 300 es
 precision highp float;
 in float vA;
 in float vH;
-uniform vec3 Ink, Hot;
+in float vS;
+uniform vec3 Ink, Hot, Sig;
 uniform float Add;
 out vec4 o;
 void main(){
@@ -85,20 +92,59 @@ void main(){
   if(r>.25)discard;
   float e=smoothstep(.25,.1,r);
   float a=vA*e*(.34+.66*vH);
-  vec3 col=mix(Ink,Hot,vH);
+  vec3 col=mix(mix(Ink,Hot,vH),Sig,clamp(vS,0.,1.));
   o=vec4(col,a);
 }`;
 
 //                 hero roam  move  driv  circ  calm  cont
 const CAM_Y   =   [2.5, 4.2,  3.1,  4.4,  3.0,  2.2,  2.3];
+const GRAPH   =   [.58, .3,   .38,  .3,   .4,   .5,   .55];
 const PITCH   =   [.15, .26,  .32,  .38,  .24,  .13,  .1];
 const DIM     =   [.9,  .9,   1.05, .85,  1.1,  .42,  1.0];
 const HEAT    =   [.85, .75,  1.5,  .8,   1.2,  .35,  1.25];
 const FLOW    =   [.55, .22,  .15,  .1,   .05,  .28,  .1];
 
+// Signal network: a layered graph floating above the terrain, pulses running along its edges.
+const GVS = `#version 300 es
+precision highp float;
+in vec3 p;
+in vec2 m; // along-edge position (-1 for nodes), phase
+uniform float T, Asp, Dpr, CamY, Pitch, Node;
+out float vS;
+out float vP;
+void main(){
+  float spread=max(1.,Asp/1.5);
+  vec3 w=vec3(p.x*17.*spread,p.y+sin(T*.32+p.x*5.+p.z)*.22,p.z);
+  vec3 q=vec3(w.x,w.y-CamY,w.z);
+  float c=cos(Pitch),s=sin(Pitch);
+  q=vec3(q.x,q.y*c-q.z*s,q.y*s+q.z*c);
+  gl_Position=vec4(q.x*1.55/Asp,q.y*1.55,0.,max(.1,-q.z));
+  gl_PointSize=(2.2+1.6*(.5+.5*sin(T*1.3+m.y*6.283)))*Dpr;
+  vS=m.x;
+  vP=m.y;
+}`;
+const GFS = `#version 300 es
+precision highp float;
+in float vS;
+in float vP;
+uniform float T, G, Node;
+uniform vec3 Sig, Hot;
+out vec4 o;
+void main(){
+  if(Node>.5){
+    float r=dot(gl_PointCoord-.5,gl_PointCoord-.5);
+    if(r>.25)discard;
+    o=vec4(mix(Sig,Hot,step(.82,vP)),G*.85);
+    return;
+  }
+  float t=fract(T*(.09+vP*.11)+vP*17.);
+  float pulse=smoothstep(.07,0.,abs(t*1.2-.1-vS));
+  o=vec4(mix(Sig,Hot,step(.82,vP)),G*(.13+pulse*.95));
+}`;
+
 const PALETTES = {
-  dark:  { bg: [0.016, 0.075, 0.086], ink: [0.57, 0.72, 0.72], hot: [1.0, 0.353, 0.122], add: 1 },
-  light: { bg: [0.937, 0.918, 0.875], ink: [0.05, 0.27, 0.31], hot: [0.84, 0.25, 0.04], add: 0 },
+  dark:  { bg: [0.016, 0.075, 0.086], ink: [0.47, 0.74, 0.78], hot: [1.0, 0.353, 0.122], sig: [0.216, 0.902, 0.847], add: 1 },
+  light: { bg: [0.937, 0.918, 0.875], ink: [0.05, 0.27, 0.31], hot: [0.84, 0.25, 0.04], sig: [0, 0.5, 0.53], add: 0 },
 };
 
 function compile(gl, type, src) {
@@ -127,8 +173,52 @@ export function createWorld(canvas, { still = false } = {}) {
   }
   gl.useProgram(prog);
   const u = {};
-  for (const n of ['T', 'Asp', 'Dpr', 'Dim', 'Heat', 'CamY', 'Pitch', 'Pi', 'Flow', 'P', 'Ink', 'Hot', 'Add']) u[n] = gl.getUniformLocation(prog, n);
+  for (const n of ['T', 'Asp', 'Dpr', 'Dim', 'Heat', 'CamY', 'Pitch', 'Pi', 'Flow', 'P', 'Ink', 'Hot', 'Sig', 'Add']) u[n] = gl.getUniformLocation(prog, n);
   u.M = gl.getUniformLocation(prog, 'M');
+
+  // --- signal network geometry (seeded, so every visit draws the same graph)
+  const gProg = gl.createProgram();
+  gl.attachShader(gProg, compile(gl, gl.VERTEX_SHADER, GVS));
+  gl.attachShader(gProg, compile(gl, gl.FRAGMENT_SHADER, GFS));
+  gl.bindAttribLocation(gProg, 1, 'p');
+  gl.bindAttribLocation(gProg, 2, 'm');
+  gl.linkProgram(gProg);
+  const gu = {};
+  for (const n of ['T', 'Asp', 'Dpr', 'CamY', 'Pitch', 'G', 'Node', 'Sig', 'Hot']) gu[n] = gl.getUniformLocation(gProg, n);
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const layers = [];
+  const LAYERS = innerWidth < 760 ? 5 : 8;
+  for (let l = 0; l < LAYERS; l++) {
+    const n = 5 + Math.floor(rnd() * 5);
+    const col = [];
+    for (let i = 0; i < n; i++) col.push([(l / (LAYERS - 1)) * 1.9 - 0.95 + (rnd() - 0.5) * 0.05, 2.6 + (i / (n - 1)) * 6.4 + (rnd() - 0.5) * 0.5, -15 - rnd() * 10, rnd()]);
+    layers.push(col);
+  }
+  const nodes = layers.flat();
+  const edges = [];
+  for (let l = 0; l < LAYERS - 1; l++) for (const a of layers[l]) {
+    const links = 2 + Math.floor(rnd() * 2);
+    for (let k = 0; k < links; k++) {
+      const b = layers[l + 1][Math.floor(rnd() * layers[l + 1].length)];
+      const ph = rnd();
+      edges.push(a[0], a[1], a[2], 0, ph, b[0], b[1], b[2], 1, ph);
+    }
+  }
+  const eCount = edges.length / 5;
+  const nCount = nodes.length;
+  const gData = new Float32Array([...edges, ...nodes.flatMap((n) => [n[0], n[1], n[2], -1, n[3]])]);
+  const gBuf = gl.createBuffer();
+  const gVao = gl.createVertexArray();
+  gl.bindVertexArray(gVao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, gData, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(1);
+  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 20, 0);
+  gl.enableVertexAttribArray(2);
+  gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 20, 12);
+  const fieldVao = gl.createVertexArray();
+  gl.bindVertexArray(fieldVao);
 
   const buf = gl.createBuffer();
   let count = 0;
@@ -139,6 +229,7 @@ export function createWorld(canvas, { still = false } = {}) {
       d[k++] = (x / (cols - 1)) * 2 - 1;
       d[k++] = (y / (rows - 1)) * 2 - 1;
     }
+    gl.bindVertexArray(fieldVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, d, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
@@ -163,11 +254,11 @@ export function createWorld(canvas, { still = false } = {}) {
   resize();
 
   const w = [1, 0, 0, 0, 0, 0, 0];
-  const pal = { bg: [0, 0, 0], ink: [0, 0, 0], hot: [0, 0, 0], add: 1 };
+  const pal = { bg: [0, 0, 0], ink: [0, 0, 0], hot: [0, 0, 0], sig: [0, 0, 0], add: 1 };
   const applyPal = (name, snap) => {
     const p = PALETTES[name];
     target.pal = p;
-    if (snap) { pal.bg = [...p.bg]; pal.ink = [...p.ink]; pal.hot = [...p.hot]; pal.add = p.add; }
+    if (snap) { pal.bg = [...p.bg]; pal.ink = [...p.ink]; pal.hot = [...p.hot]; pal.sig = [...p.sig]; pal.add = p.add; }
   };
   const target = { mode: 0, pal: PALETTES.dark, px: 0, py: 0, pi: 0, master: 0 };
   const cur = { px: 0, py: 0, pi: 0, master: 0 };
@@ -183,7 +274,7 @@ export function createWorld(canvas, { still = false } = {}) {
     for (let i = 0; i < 7; i++) w[i] /= sum;
 
     const kPal = 1 - Math.exp(-dt * 6);
-    for (const key of ['bg', 'ink', 'hot']) for (let i = 0; i < 3; i++) pal[key][i] += (target.pal[key][i] - pal[key][i]) * kPal;
+    for (const key of ['bg', 'ink', 'hot', 'sig']) for (let i = 0; i < 3; i++) pal[key][i] += (target.pal[key][i] - pal[key][i]) * kPal;
     pal.add += (target.pal.add - pal.add) * kPal;
 
     const kP = 1 - Math.exp(-dt * 7);
@@ -210,9 +301,28 @@ export function createWorld(canvas, { still = false } = {}) {
     gl.uniform2f(u.P, cur.px, cur.py);
     gl.uniform3fv(u.Ink, pal.ink);
     gl.uniform3fv(u.Hot, pal.hot);
+    gl.uniform3fv(u.Sig, pal.sig);
     gl.uniform1f(u.Add, pal.add);
     gl.uniform1fv(u.M, w);
+    gl.bindVertexArray(fieldVao);
     gl.drawArrays(gl.POINTS, 0, count);
+
+    gl.useProgram(gProg);
+    gl.bindVertexArray(gVao);
+    gl.uniform1f(gu.T, t);
+    gl.uniform1f(gu.Asp, canvas.width / canvas.height);
+    gl.uniform1f(gu.Dpr, dpr);
+    gl.uniform1f(gu.CamY, mix(CAM_Y));
+    gl.uniform1f(gu.Pitch, mix(PITCH));
+    gl.uniform1f(gu.G, mix(GRAPH) * cur.master * (pal.add > 0.5 ? 1 : 1.2));
+    gl.uniform3fv(gu.Sig, pal.sig);
+    gl.uniform3fv(gu.Hot, pal.hot);
+    gl.uniform1f(gu.Node, 0);
+    gl.drawArrays(gl.LINES, 0, eCount);
+    gl.uniform1f(gu.Node, 1);
+    gl.drawArrays(gl.POINTS, eCount, nCount);
+    gl.useProgram(prog);
+    gl.bindVertexArray(fieldVao);
 
     // Drop detail once if this device can't hold frame rate; never drop the effect.
     if (!still && quality === 1 && frames < 240) {

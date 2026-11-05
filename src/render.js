@@ -53,6 +53,7 @@ export function renderPage(locale, now = new Date()) {
     .sort((a, b) => Number(timeline[a.id].commitment === 'part') - Number(timeline[b.id].commitment === 'part'));
   const allSkills = Object.values(skills).flat();
   const words = t.about.bio.split(' ').map((w) => `<span class="w">${esc(w)}</span>`).join(' ');
+  const tokens = t.hero.statement.split(' ').map((w) => `<span class="tk">${esc(w)}</span>`).join(' ');
 
   return `
 <a class="skip" href="#about">${esc(t.skip)}</a>
@@ -74,8 +75,8 @@ export function renderPage(locale, now = new Date()) {
   <section class="hero" data-world="0">
     <div class="hero-top">
       <div class="hero-intro">
-        <p class="role mono reveal">${esc(t.hero.title)}</p>
-        <p class="statement reveal" style="--d:1">${esc(t.hero.statement)}</p>
+        <p class="role mono reveal" data-scramble>${esc(t.hero.title)}</p>
+        <p class="statement reveal" style="--d:1" data-stream>${tokens}</p>
         <p class="based reveal" style="--d:2">${esc(t.hero.based)}</p>
         <div class="actions reveal" style="--d:3">
           <a class="btn primary" data-magnetic href="mailto:${esc(site.email)}"><span>${esc(t.hero.email)}</span></a>
@@ -96,7 +97,7 @@ export function renderPage(locale, now = new Date()) {
   </section>
 
   <section class="about section" id="about" data-world="5">
-    <header class="section-head reveal"><span class="mono">01</span><h2 class="mono">${esc(t.about.heading)}</h2></header>
+    <header class="section-head reveal"><span class="mono">01</span><h2 class="mono" data-scramble>${esc(t.about.heading)}</h2></header>
     <p class="bio" data-words>${words}</p>
     <div class="langs reveal">
       <h3 class="mono">${esc(t.about.langTitle)}</h3>
@@ -105,14 +106,14 @@ export function renderPage(locale, now = new Date()) {
   </section>
 
   <section class="work" id="work">
-    <header class="section-head section-pad reveal" data-world="5"><span class="mono">02</span><h2 class="mono">${esc(t.work.heading)}</h2></header>
+    <header class="section-head section-pad reveal" data-world="5"><span class="mono">02</span><h2 class="mono" data-scramble>${esc(t.work.heading)}</h2></header>
     ${projects.map((p, i) => {
       const item = t.work.items[p.id];
       const name = p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><span class="sr-only">${esc(p.name)}</span>${kinetic(p.name)}</a>` : `<span class="sr-only">${esc(p.name)}</span>${kinetic(p.name)}`;
       return `<article class="project" data-project data-world="${i + 1}">
         <div class="project-in">
           <div class="p-top mono"><span>${pad(i + 1)} / ${pad(projects.length)}</span><span>${esc(item.kind)}</span></div>
-          <h3 class="p-name">${name}</h3>
+          <h3 class="p-name" data-kinetic>${name}</h3>
           <div class="p-body">
             <p class="p-summary">${esc(item.summary)}</p>
             <dl class="p-stack">${p.stack.map(([k, v], n) => `<div style="--n:${n}"><dt class="mono">${esc(t.work.layers[k])}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
@@ -123,7 +124,7 @@ export function renderPage(locale, now = new Date()) {
   </section>
 
   <section class="experience section" id="experience" data-world="5">
-    <header class="section-head reveal"><span class="mono">03</span><h2 class="mono">${esc(t.experience.heading)}</h2></header>
+    <header class="section-head reveal"><span class="mono">03</span><h2 class="mono" data-scramble>${esc(t.experience.heading)}</h2></header>
     ${chart(t, now)}
     <div class="jobs">${t.experience.jobs.map((j, i) => {
       const d = timeline[j.id];
@@ -138,13 +139,13 @@ export function renderPage(locale, now = new Date()) {
   <div class="band" aria-hidden="true" data-world="2"><div class="band-track">${[0, 1, 2, 3].map(() => `<span>${allSkills.map((s) => `${esc(s)}<i></i>`).join('')}</span>`).join('')}</div></div>
 
   <section class="skills section" id="skills" data-world="2">
-    <header class="section-head reveal"><span class="mono">04</span><h2 class="mono">${esc(t.skills.heading)}</h2></header>
-    ${Object.entries(skills).map(([cat, list]) => `<div class="skill-group reveal"><h3 class="mono">${esc(t.skills.categories[cat])}</h3>
+    <header class="section-head reveal"><span class="mono">04</span><h2 class="mono" data-scramble>${esc(t.skills.heading)}</h2></header>
+    ${Object.entries(skills).map(([cat, list]) => `<div class="skill-group reveal"><h3 class="mono" data-scramble>${esc(t.skills.categories[cat])}</h3>
       <ul>${list.map((s, i) => `<li style="--i:${i}">${esc(s)}</li>`).join('')}</ul></div>`).join('')}
   </section>
 
   <section class="contact" id="contact" data-world="6">
-    <header class="section-head section-pad reveal"><span class="mono">05</span><h2 class="mono">${esc(t.contact.heading)}</h2></header>
+    <header class="section-head section-pad reveal"><span class="mono">05</span><h2 class="mono" data-scramble>${esc(t.contact.heading)}</h2></header>
     <p class="contact-text reveal">${esc(t.contact.text)}</p>
     <a class="hello" data-kinetic data-fit="all" href="mailto:${esc(site.email)}"><span class="sr-only">${esc(t.contact.button)}</span>${kinetic(up(t.contact.button))}</a>
     <div class="contact-row">
